@@ -220,15 +220,15 @@ const handleStaffLogin = async (event) => {
 
     try {
       const response = await fetch(
-        "http://localhost:8080/api/orders",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(orderData),
-        }
-      );
+  "https://hotel-management-backend-93or.onrender.com/api/orders",
+  {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(orderData),
+  }
+);
 
       const data = await response.json();
 
