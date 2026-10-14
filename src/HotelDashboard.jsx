@@ -4,6 +4,7 @@ const API_URL = "http://localhost:8080/api";
 
 function HotelDashboard() {
   const [orders, setOrders] = useState([]);
+  const [allOrders, setAllOrders] = useState([]);
   const [orderItems, setOrderItems] = useState({});
   const [foodNames, setFoodNames] = useState({});
   const [loading, setLoading] = useState(true);
@@ -27,6 +28,7 @@ const [statusFilter, setStatusFilter] = useState("ALL");
       }
 
       const data = await response.json();
+      setAllOrders(data);
       // Detect newly arrived orders
 // Detect newly arrived orders
 const currentOrderIds = data.map((order) => order.id);
@@ -195,51 +197,43 @@ setOrders(activeOrders);
 
   // Determine the next order action
   const getNextAction = (status) => {
-    switch (status) {
-      case "PENDING":
-        return {
-          status: "ACCEPTED",
-          label: "Accept Order",
-        };
+  switch (status) {
+    case "PENDING":
+      return {
+        status: "ACCEPTED",
+        label: "Accept Order",
+      };
 
-      case "ACCEPTED":
-        return {
-          status: "PREPARING",
-          label: "Start Preparing",
-        };
+    case "PREPARING":
+      return {
+        status: "READY",
+        label: "Mark Ready",
+      };
 
-      case "PREPARING":
-        return {
-          status: "READY",
-          label: "Mark Ready",
-        };
+    case "READY":
+      return {
+        status: "DELIVERED",
+        label: "Mark Delivered",
+      };
 
-      case "READY":
-        return {
-          status: "DELIVERED",
-          label: "Mark Delivered",
-        };
+    default:
+      return null;
+  }
+};
+ // Dashboard statistics
+const totalOrders = allOrders.length;
 
-      default:
-        return null;
-    }
-  };
-
-  // Dashboard statistics
-const totalOrders = orders.length;
-
-const pendingOrders = orders.filter(
+const pendingOrders = allOrders.filter(
   (order) => order.status === "PENDING"
 ).length;
 
-const preparingOrders = orders.filter(
+const preparingOrders = allOrders.filter(
   (order) => order.status === "PREPARING"
 ).length;
 
-const completedOrders = orders.filter(
+const completedOrders = allOrders.filter(
   (order) => order.status === "DELIVERED"
 ).length;
-
   // Search and filter orders
 const filteredOrders = orders.filter((order) => {
   const search = searchTerm.trim().toLowerCase();
@@ -254,6 +248,11 @@ const filteredOrders = orders.filter((order) => {
 
   return matchesSearch && matchesStatus;
 });
+
+
+
+
+
 
   return (
     <main
@@ -283,6 +282,37 @@ const filteredOrders = orders.filter((order) => {
           Manage customer orders and track kitchen preparation.
         </p>
       </header>
+
+
+      {/* DASHBOARD STATISTICS */}
+<div
+  style={{
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+    gap: "20px",
+    marginBottom: "25px",
+  }}
+>
+  <div style={{ backgroundColor: "#e3f2fd", padding: "20px", borderRadius: "10px", textAlign: "center" }}>
+    <h3>Total Orders</h3>
+    <h2>{totalOrders}</h2>
+  </div>
+
+  <div style={{ backgroundColor: "#fff3e0", padding: "20px", borderRadius: "10px", textAlign: "center" }}>
+    <h3>Pending Orders</h3>
+    <h2>{pendingOrders}</h2>
+  </div>
+
+  <div style={{ backgroundColor: "#f3e5f5", padding: "20px", borderRadius: "10px", textAlign: "center" }}>
+    <h3>Preparing Orders</h3>
+    <h2>{preparingOrders}</h2>
+  </div>
+
+  <div style={{ backgroundColor: "#e8f5e9", padding: "20px", borderRadius: "10px", textAlign: "center" }}>
+    <h3>Completed Orders</h3>
+    <h2>{completedOrders}</h2>
+  </div>
+</div>
 
       {/* NEW ORDER NOTIFICATION */}
 {notification && (

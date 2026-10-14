@@ -1,13 +1,53 @@
 import { useEffect, useState } from "react";
 import HotelDashboard from "./HotelDashboard";
+import KitchenDashboard from "./KitchenDashboard";
 
 function App() {
+
+  const printStyles = `
+  @media print {
+    body * {
+      visibility: hidden;
+    }
+
+    .customer-bill,
+    .customer-bill * {
+      visibility: visible;
+    }
+
+    .customer-bill {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 100%;
+      border: none !important;
+      background: white !important;
+      color: black !important;
+      box-shadow: none !important;
+    }
+
+    .no-print {
+      display: none !important;
+    }
+  }
+`;
   const [foods, setFoods] = useState([]);
   const [cart, setCart] = useState([]);
+  const tableFromURL = new URLSearchParams(window.location.search).get("table");
+
+const tableNumber = Number(tableFromURL);
+
+const [tableId] = useState(
+  Number.isInteger(tableNumber) && tableNumber >= 1 && tableNumber <= 5
+    ? tableNumber
+    : null
+);
+  const [billOrder, setBillOrder] = useState(null);
   const [loadingFoods, setLoadingFoods] = useState(true);
   const [placingOrder, setPlacingOrder] = useState(false);
   const [error, setError] = useState("");
   const [showDashboard, setShowDashboard] = useState(false);
+  const [showKitchenDashboard, setShowKitchenDashboard] = useState(false);
   // Customer order tracking states
 const [trackingOrderId, setTrackingOrderId] = useState("");
 const [trackedOrder, setTrackedOrder] = useState(null);
@@ -170,7 +210,7 @@ const handleStaffLogin = async (event) => {
     setPlacingOrder(true);
 
     const orderData = {
-      tableId: 2,
+      tableId: tableId,
       items: cart.map((item) => ({
         foodId: item.id,
         quantity: item.quantity,
@@ -206,8 +246,22 @@ const handleStaffLogin = async (event) => {
           data.totalAmount
       );
 
-      // Clear cart after successful order
-      setCart([]);
+      // Save order details for customer bill
+setBillOrder({
+  orderId: data.orderId,
+  tableId: orderData.tableId,
+  items: cart.map((item) => ({
+    name: item.name,
+    quantity: item.quantity,
+    price: item.price,
+    subtotal: item.price * item.quantity,
+  })),
+  totalAmount: data.totalAmount,
+  date: new Date().toLocaleString(),
+});
+
+// Clear cart after successful order
+setCart([]);
     } catch (err) {
       console.error("Order error:", err);
       alert("Could not place order: " + err.message);
@@ -253,6 +307,39 @@ const trackOrder = async (event) => {
     setTrackingLoading(false);
   }
 };
+
+// Automatically refresh the tracked order every 5 seconds
+useEffect(() => {
+  if (!trackingOrderId.trim() || !trackedOrder) {
+    return;
+  }
+
+  const refreshTrackedOrder = async () => {
+    try {
+      const response = await fetch("http://localhost:8080/api/orders");
+
+      if (!response.ok) {
+        return;
+      }
+
+      const orders = await response.json();
+
+      const updatedOrder = orders.find(
+        (order) => String(order.id) === trackingOrderId.trim()
+      );
+
+      if (updatedOrder) {
+        setTrackedOrder(updatedOrder);
+      }
+    } catch (err) {
+      console.error("Order tracking refresh failed:", err);
+    }
+  };
+
+  const intervalId = setInterval(refreshTrackedOrder, 5000);
+
+  return () => clearInterval(intervalId);
+}, [trackingOrderId, trackedOrder]);
 // Staff Login Page
 if (showLogin && !showDashboard) {
   return (
@@ -406,6 +493,37 @@ if (showLogin && !showDashboard) {
     );
   }
 
+  // Kitchen Dashboard
+if (showKitchenDashboard) {
+  return (
+    <div
+      style={{
+        maxWidth: "1200px",
+        margin: "0 auto",
+        padding: "25px",
+        fontFamily: "Arial, sans-serif",
+      }}
+    >
+      <button
+        onClick={() => setShowKitchenDashboard(false)}
+        style={{
+          padding: "12px 20px",
+          backgroundColor: "#343a40",
+          color: "white",
+          border: "none",
+          borderRadius: "6px",
+          cursor: "pointer",
+          marginBottom: "20px",
+        }}
+      >
+        ← Back to Customer Menu
+      </button>
+
+      <KitchenDashboard />
+    </div>
+  );
+}
+
   // Customer ordering page
   return (
     <div
@@ -416,6 +534,8 @@ if (showLogin && !showDashboard) {
         fontFamily: "Arial, sans-serif",
       }}
     >
+      <style>{printStyles}</style>
+
       {/* HEADER */}
       <h1 style={{ textAlign: "center" }}>
         Hotel Ordering System
@@ -444,6 +564,24 @@ if (showLogin && !showDashboard) {
         >
           Open Hotel Dashboard
         </button>
+
+        <button
+  onClick={() => setShowKitchenDashboard(true)}
+  style={{
+    padding: "12px 24px",
+    marginLeft: "10px",
+    backgroundColor: "#198754",
+    color: "white",
+    border: "none",
+    borderRadius: "6px",
+    fontSize: "16px",
+    cursor: "pointer",
+  }}
+>
+  Open Kitchen Dashboard
+</button>
+
+        
       </div>
 
       <hr />
@@ -526,11 +664,39 @@ if (showLogin && !showDashboard) {
       </p>
 
       <p>
-        <strong>Status:</strong>{" "}
-        <span style={{ color: "#198754", fontWeight: "bold" }}>
-          {trackedOrder.status}
-        </span>
-      </p>
+  <strong>Status:</strong>{" "}
+  <span style={{ color: "#198754", fontWeight: "bold" }}>
+    {trackedOrder.status}
+  </span>
+</p>
+
+<div
+  style={{
+    marginTop: "15px",
+    padding: "12px",
+    borderRadius: "8px",
+    backgroundColor: "#e8f4fd",
+    border: "1px solid #b6dfff",
+  }}
+>
+  <strong>Order Update:</strong>
+  <p style={{ marginBottom: 0 }}>
+    {trackedOrder.status === "PENDING" &&
+      "⏳ Your order has been placed. Waiting for hotel confirmation."}
+
+    {trackedOrder.status === "ACCEPTED" &&
+      "✅ Your order has been accepted by the hotel!"}
+
+    {trackedOrder.status === "PREPARING" &&
+      "👨‍🍳 The chef is preparing your food."}
+
+    {trackedOrder.status === "READY" &&
+      "🍽️ Your food is ready!"}
+
+    {trackedOrder.status === "DELIVERED" &&
+      "🎉 Your order has been delivered. Enjoy your meal!"}
+  </p>
+</div>
 
       <p>
         <strong>Total Amount:</strong> ₹{trackedOrder.totalAmount}
@@ -538,6 +704,75 @@ if (showLogin && !showDashboard) {
     </div>
   )}
 </div>
+
+{/* CUSTOMER BILL */}
+{billOrder && (
+  <div
+    className="customer-bill"
+    style={{
+      border: "2px solid #198754",
+      borderRadius: "10px",
+      padding: "25px",
+      margin: "25px 0",
+      backgroundColor: "#f8fff9",
+    }}
+  >
+    <h2 style={{ textAlign: "center" }}>🧾 Customer Bill</h2>
+
+    <hr />
+
+    <p><strong>Order ID:</strong> {billOrder.orderId}</p>
+    <p><strong>Table Number:</strong> {billOrder.tableId}</p>
+    <p><strong>Date:</strong> {billOrder.date}</p>
+
+    <hr />
+
+    <h3>Ordered Items</h3>
+
+    {billOrder.items.map((item, index) => (
+      <div
+        key={index}
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          gap: "10px",
+          padding: "8px 0",
+          borderBottom: "1px solid #ddd",
+        }}
+      >
+        <span>
+          {item.name} × {item.quantity}
+        </span>
+
+        <span>₹{item.subtotal}</span>
+      </div>
+    ))}
+
+    <h2 style={{ textAlign: "right", color: "#198754" }}>
+      Total: ₹{billOrder.totalAmount}
+    </h2>
+
+    <p style={{ textAlign: "center" }}>
+      Thank you for ordering! Visit us again.
+    </p>
+
+    <button
+  className="no-print"
+  onClick={() => window.print()}
+      style={{
+        padding: "12px 24px",
+        backgroundColor: "#198754",
+        color: "white",
+        border: "none",
+        borderRadius: "6px",
+        cursor: "pointer",
+      }}
+    >
+      🖨️ Print Bill
+    </button>
+  </div>
+)}
+
 
       {/* FOOD MENU */}
       <h2>Food Menu</h2>
@@ -682,8 +917,10 @@ if (showLogin && !showDashboard) {
           >
             <h2>Total Amount: ₹{getTotal()}</h2>
 
-            <p>Table Number: 2</p>
-
+            <p>
+  <strong>Table Number:</strong>{" "}
+  {tableId !== null ? tableId : "Please scan a table QR code"}
+</p>
             {/* PLACE ORDER */}
             <button
               onClick={placeOrder}
